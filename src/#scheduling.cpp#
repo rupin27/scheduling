@@ -1,0 +1,205 @@
+#include <scheduling.h>
+#include <string.h>
+#include <fstream>
+#include <iostream>
+#include <queue>
+#include <list>
+#include <stdio.h>
+#include <stdlib.h>
+#include <cstring>
+
+using namespace std;
+
+pqueue_arrival read_workload(string filename) {
+  pqueue_arrival workload;
+  ifstream strm;
+  if(strm.is_open()) {
+    cout << "Error: Open file";
+    exit(1);
+  }
+  strm.open(filename);
+  if(strm.peek() == ifstream::traits_type::eof()){
+    cout << "Error: Empty file";
+    exit(1);
+    }
+  string str;
+  while (getstr(strm, str)) {
+    Process p;
+    char* strArr = new char[str.length() + 1];
+    strcpy(strArr, str.c_str());
+    char* tkn = strtok(strArr, " ");
+    int i = 0;
+    while(tkn != NULL) {
+      if(i == 0){
+        p.arrival = atoi(tkn);
+      }
+      else if(i == 1){
+        p.duration = atoi(tkn);
+      }
+      i++;
+      tkn = strtok(NULL, " ");
+    }
+    workload.push(p);
+  }
+  return workload;
+}
+
+void show_workload(pqueue_arrival workload) {
+  pqueue_arrival xs = workload;
+  cout << "Workload:" << endl;
+  while (!xs.empty()) {
+    Process p = xs.top();
+    cout << '\t' << p.arrival << ' ' << p.duration << endl;
+    xs.pop();
+  }
+}
+z
+void show_processes(list<Process> processes) {
+  list<Process> xs = processes;
+  cout << "Processes:" << endl;
+  while (!xs.empty()) {
+    Process p = xs.front();
+    cout << "\tarrival=" << p.arrival << ", duration=" << p.duration
+         << ", first_run=" << p.first_run << ", completion=" << p.completion
+         << endl;
+    xs.pop_front();
+  }
+}
+
+list<Process> fifo(pqueue_arrival workload) {
+  list<Process> complete;
+  int time = 0;
+  time = workload.top().arrival;
+  while(!workload.empty()){
+    Process p = workload.top(); 
+    workload.pop();
+    p.first_run = time;
+    p.completion = time + p.duration;
+    time = p.completion;
+    complete.push_back(p);
+  }     
+  return complete;
+}
+
+list<Process> sjf(pqueue_arrival workload) {
+  list<Process> complete;
+  pqueue_duration real;
+  int time = 0;
+  time = workload.top().arrival;
+  while (!workload.empty() || !real.empty()) {
+    while(!workload.empty() && workload.top().arrival <= time){
+      Process x = workload.top();
+      real.push(x);
+      workload.pop();
+    } 
+    Process p = real.top();
+    real.pop();
+    p.first_run = time;
+    p.completion = time + p.duration;
+    time = p.completion;
+    complete.push_back(p);
+    }
+  return complete;
+}
+
+list<Process> stcf(pqueue_arrival workload) {
+  list<Process> complete; 
+  pqueue_duration real;
+  int time = 0;
+  time = workload.top().arrival;
+  while(!workload.empty() && workload.top().arrival == time){
+    Process p = workload.top();
+    p.first_run = -1;
+    real.push(p);
+    workload.pop();
+  } 
+  while (!real.empty()) {
+    Process p = real.top();
+    real.pop();
+    if (p.first_run == -1){
+      p.first_run = time;
+    }
+    p.duration = p.duration - 1;
+    time += 1; 
+
+    if (p.duration == 0) {
+      p.completion = time;
+      complete.push_back(p);
+    } 
+    else { 
+      real.push(p);
+    }
+    while(!workload.empty() && workload.top().arrival == time){
+      Process p = workload.top();
+      p.first_run = -1;  
+      real.push(p);
+      workload.pop();
+    }
+  }
+  return complete;
+}
+
+list<Process> rr(pqueue_arrival workload) {
+  list<Process> complete;
+  list<Process> arrived;
+  int time = 0;
+  time = workload.top().arrival;
+  while (!workload.empty() && workload.top().arrival == time){
+    Process p = workload.top();
+    p.first_run = -1;
+    arrived.push_back(p);
+    workload.pop();
+  } 
+
+  while (!arrived.empty()){
+    Process p = arrived.front();
+    arrived.pop_front();
+    if (p.first_run == -1) {
+      p.first_run = time;
+    }
+    p.duration = p.duration - 1;
+    time += 1;
+
+    if (p.duration == 0) {
+      p.completion = time;
+      complete.push_back(p);
+    } 
+    else { 
+      arrived.push_back(p);
+    }
+  }
+  return complete;
+}
+
+float avg_turnaround(list<Process> processes) {
+  float res = 0;
+  float size = (float) processes.size();
+  while(!processes.empty()){
+    Process p = processes.front();
+    processes.pop_front();
+    float tt = (float) p.completion -(float) p.arrival;
+    res += tt; 
+  }
+  return res / size;
+}
+
+float avg_response(list<Process> processes) {
+  float res = 0;
+  float size = (float) processes.size(); 
+  while(!processes.empty()){
+    Process p = processes.front();
+    processes.pop_front();
+    float rt = (float) p.first_run - (float) p.arrival;
+    res += rt;
+  }
+  return res/size;
+}
+
+void show_metrics(list<Process> processes) {
+  float avg_t = avg_turnaround(processes);
+  float avg_r = avg_response(processes);
+  show_processes(processes);
+  cout << '\n';
+  cout << "Average Turnaround Time: " << avg_t << endl;
+  cout << "Average Response Time:   " << avg_r << endl;
+}
